@@ -1,0 +1,117 @@
+version: '3.7'
+services:
+
+  dibimbing-dataeng-ops-postgres:
+    image: postgres:11
+    container_name: ${OPS_POSTGRES_CONTAINER_NAME}
+    restart: unless-stopped
+    hostname: ${OPS_POSTGRES_CONTAINER_NAME}
+    environment:
+      - POSTGRES_PASSWORD=${OPS_POSTGRES_PASSWORD}
+      - POSTGRES_USER=${OPS_POSTGRES_USER}
+      - POSTGRES_DB=${OPS_POSTGRES_DB}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ../data:/data
+    ports:
+      - ${OPS_POSTGRES_PORT}:5432
+
+  dibimbing-dataeng-dw-postgres:
+    image: postgres:11
+    container_name: ${DW_POSTGRES_CONTAINER_NAME}
+    restart: unless-stopped
+    hostname: ${DW_POSTGRES_CONTAINER_NAME}
+    environment:
+      - POSTGRES_PASSWORD=${DW_POSTGRES_PASSWORD}
+      - POSTGRES_USER=${DW_POSTGRES_USER}
+      - POSTGRES_DB=${DW_POSTGRES_DB}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ../data:/data
+    ports:
+      - ${DW_POSTGRES_PORT}:5432
+
+  scheduler:
+    image: dataeng-dibimbing/airflow
+    container_name: ${AIRFLOW_SCHEDULER_CONTAINER_NAME}
+    hostname: ${AIRFLOW_SCHEDULER_CONTAINER_NAME}
+    command: scheduler
+    restart: always
+    depends_on:
+      - dibimbing-dataeng-ops-postgres
+    environment:
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${OPS_POSTGRES_USER}:${OPS_POSTGRES_PASSWORD}@${OPS_POSTGRES_CONTAINER_NAME}/${OPS_POSTGRES_DB}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - POSTGRES_USER=${OPS_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${OPS_POSTGRES_PASSWORD}
+      - POSTGRES_DB=${OPS_POSTGRES_DB}
+      - POSTGRES_CONTAINER_NAME=${OPS_POSTGRES_CONTAINER_NAME}
+      - POSTGRES_PORT=${OPS_POSTGRES_PORT}
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - ../data:/opt/airflow/data
+      - ../scripts:/scripts
+
+  webserver:
+    image: dataeng-dibimbing/airflow
+    container_name: ${AIRFLOW_WEBSERVER_CONTAINER_NAME}
+    hostname: ${AIRFLOW_WEBSERVER_CONTAINER_NAME}
+    entrypoint: /scripts/airflow_entrypoint.sh
+    restart: always
+    depends_on:
+      - scheduler
+    environment:
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${OPS_POSTGRES_USER}:${OPS_POSTGRES_PASSWORD}@${OPS_POSTGRES_CONTAINER_NAME}/${OPS_POSTGRES_DB}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - POSTGRES_USER=${OPS_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${OPS_POSTGRES_PASSWORD}
+      - POSTGRES_DB=${OPS_POSTGRES_DB}
+      - POSTGRES_CONTAINER_NAME=${OPS_POSTGRES_CONTAINER_NAME}
+      - POSTGRES_PORT=${OPS_POSTGRES_PORT}
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - ../data:/opt/airflow/data
+      - ../scripts:/scripts
+    ports:
+      - ${AIRFLOW_WEBSERVER_PORT}:8080
+  
+  metabase:
+    image: metabase/metabase:v0.47.3
+    container_name: ${METABASE_CONTAINER_NAME}
+    depends_on:
+      - dibimbing-dataeng-dw-postgres
+      - dibimbing-dataeng-ops-postgres
+    ports:
+      - "${METABASE_PORT}:3000"
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME=${OPS_POSTGRES_DB}
+      - MB_DB_HOST=${OPS_POSTGRES_CONTAINER_NAME}
+      - MB_DB_USER=${OPS_POSTGRES_USER}
+      - MB_DB_PASS=${OPS_POSTGRES_PASSWORD}
+      - MB_DB_PORT=5432
+    restart: always
+  
+  metabase-setup:
+    image: bash:5.1.16
+    container_name: metabase-setup
+    volumes:
+      - ../scripts:/tmp
+    depends_on:
+      - metabase
+    environment:
+      - DW_POSTGRES_USER=${DW_POSTGRES_USER}
+      - DW_POSTGRES_PASSWORD=${DW_POSTGRES_PASSWORD}
+      - DW_POSTGRES_DB=${DW_POSTGRES_DB}
+      - DW_POSTGRES_CONTAINER_NAME=${DW_POSTGRES_CONTAINER_NAME}
+      - DW_POSTGRES_PORT=5432
+      - MB_USER_EMAIL=${METABASE_USER_EMAIL}
+      - MB_USER_PASSWORD=${METABASE_USER_PASSWORD}
+      - MB_USER_FIRST_NAME=${METABASE_USER_FIRST_NAME}
+      - MB_USER_LAST_NAME=${METABASE_USER_LAST_NAME}
+    command: sh /tmp/metabase_entrypoint.sh ${METABASE_CONTAINER_NAME}:3000
+
+networks:
+  default:
+    name: dataeng-network
+    external: true

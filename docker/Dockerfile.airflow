@@ -1,0 +1,8 @@
+FROM apache/airflow:2.7.1-python3.9
+USER root
+USER airflow
+
+COPY --chown=airflow:root ./dags /opt/airflow/dags
+COPY --chown=airflow:root ./requirements.txt /opt/airflow/requirements.txt
+
+RUN pip install -r /opt/airflow/requirements.txt
