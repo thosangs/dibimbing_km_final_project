@@ -1,29 +1,72 @@
-# Step 1: Importing Modules
-# To initiate the DAG Object
+from datetime import datetime
+import pandas as pd
+import numpy as np
 from airflow import DAG
-# Importing datetime and timedelta modules for scheduling the DAGs
-from datetime import timedelta, datetime
-# Importing operators
-from airflow.operators.dummy_operator import DummyOperator
+from airflow.operators.python_operator import PythonOperator
+from airflow.hooks.postgres_hook import PostgresHook
 
-# Step 2: Initiating the default_args
+# Define constants
+ACTION_TYPES = ["walk", "run", "sit", "sleep"]
+PERSON_IDS = range(1, 5)
+
+
+# Function to generate random data
+def generate_random_data():
+    num_rows = 1000
+    data = {
+        "action_type": np.random.choice(ACTION_TYPES, num_rows),
+        "timestamp": pd.date_range(start="2021-01-01", periods=num_rows, freq="T"),
+        "person_id": np.random.choice(PERSON_IDS, num_rows),
+    }
+    df = pd.DataFrame(data)
+    df.to_csv("/tmp/activity_data.csv", index=False)
+
+
+# Function to ingest data to PostgreSQL
+def ingest_data_to_postgres():
+    # Initialize the PostgreSQL hook and SQLAlchemy engine
+    hook = PostgresHook(postgres_conn_id="postgres_dw")
+    engine = hook.get_sqlalchemy_engine()
+
+    # Read the data from CSV and insert into the table
+    (
+        pd.read_csv("/tmp/activity_data.csv").to_sql(
+            "activities", engine, if_exists="replace", index=False, method="multi"
+        )
+    )
+
+
+# Define the default arguments for the DAG
 default_args = {
-    'owner': 'airflow',
-    'start_date': datetime(2022, 11, 12),
+    "owner": "airflow",
+    "depends_on_past": False,
+    "email_on_failure": False,
+    "email_on_retry": False,
+    "retries": 1,
 }
 
-# Step 3: Creating DAG Object
-dag = DAG(dag_id='DAG-1',
-          default_args=default_args,
-          schedule_interval='@once',
-          catchup=False
-          )
+# Define the DAG
+dag = DAG(
+    "generate_and_ingest_activity_data",
+    default_args=default_args,
+    description="Generate random activity data and ingest into PostgreSQL",
+    schedule_interval="@once",
+    start_date=datetime(2023, 1, 1),
+    catchup=False,
+)
 
-# Step 4: Creating task
-# Creating first task
-start = DummyOperator(task_id='start', dag=dag)
-# Creating second task
-end = DummyOperator(task_id='end', dag=dag)
+# Define the tasks
+t1 = PythonOperator(
+    task_id="generate_random_data",
+    python_callable=generate_random_data,
+    dag=dag,
+)
 
-# Step 5: Setting up dependencies
-start >> end
+t2 = PythonOperator(
+    task_id="ingest_data_to_postgres",
+    python_callable=ingest_data_to_postgres,
+    dag=dag,
+)
+
+# Set the task dependencies
+t1 >> t2

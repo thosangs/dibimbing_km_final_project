@@ -1,6 +1,10 @@
-# Dibimbing - Kampus Merdeka 1 - Final Project Template
+# Dibimbing - Kampus Merdeka - Final Project Template
 
 ## How to
+- Since our goal is to minimize our resource usage, we will use free cloud databases on [Neon](https://neon.tech/). Once we create a database in it, get the connection string and put it in variable `DW_POSTGRES_URI` at `.env`
+    ```.env
+    DW_POSTGRES_URI="postgresql://...?sslmode=require"
+    ```
 - In order to spin up the containers, first you have to build all the Docker images needed using 
     ```sh
     make build
@@ -12,7 +16,7 @@
 - Once all the containers ready, you can try to
     - Access the Airflow on port `8081`
     - Access the Metabase on port `3001`, for the username and password, you can try to access the [.env](/.env) file
-    - Since we have 2 Postgres containers, you can use `dataeng-warehouse-postgres` container as your data warehouse and ignore the `dataeng-ops-postgres` container since it is only being used for the opetrational purposes.
+    - If you didn't find the created tables in the Metabase `Browse data`, you can try to sync it through Metabase admin UI
 ---
 ## Folder Structure
 
@@ -52,9 +56,9 @@ This folder contains script needed in order to automate an initializations proce
 - Data Modelling Improvisation (12%)
 
 **Implementation (40%)**
-- Data Extraction (Standard / Improved) (15%)
-- Data Pipeline (Standard / Best-Practice) (15%)
-- Data Analysis (10%)
+- Data Extraction (Standard / Improved) (12%)
+- Data Pipeline (Standard / Best-Practice) (12%)
+- Data Analysis (16%)
 
 **Presentation (10%)**
 - Slide Content (4%)
