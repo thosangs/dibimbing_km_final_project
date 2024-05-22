@@ -17,7 +17,7 @@ spinup:
 	@echo '__________________________________________________________'
 	@echo 'Creating Instances ...'
 	@echo '__________________________________________________________'
-	@docker-compose -f ./docker/docker-compose.yml --env-file .env up
+	@docker compose -f ./docker/docker-compose.yml --env-file .env up
 	@echo '==========================================================='
 
 clean:
